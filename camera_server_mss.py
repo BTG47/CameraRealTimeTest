@@ -3,21 +3,17 @@ import socket
 import struct
 import time
 import numpy as np
-import subprocess
-
+import mss
 
 # ============================================================
 # CONFIGURACIÓN
 # ============================================================
 
-# Escuchar en todas las interfaces de red de Fedora.
+# Escuchar en todas las interfaces de red.
 HOST = "0.0.0.0"
 
-# Puerto donde Fedora esperará la conexión del receptor.
+# Puerto donde se esperará la conexión del receptor.
 PORT = 9999
-
-# Cámara de Fedora.
-CAMERA_INDEX = 0
 
 # Resolución enviada.
 FRAME_WIDTH = 1280
@@ -53,15 +49,6 @@ def send_frame(conn, frame):
 
 
 def main():
-    camera = cv2.VideoCapture(CAMERA_INDEX)
-
-    if not camera.isOpened():
-        print("Error: no se pudo abrir la cámara.")
-        return
-
-    camera.set(cv2.CAP_PROP_FRAME_WIDTH, FRAME_WIDTH)
-    camera.set(cv2.CAP_PROP_FRAME_HEIGHT, FRAME_HEIGHT)
-
     server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
     # Permite reutilizar el puerto si reinicias el programa rápido.
@@ -71,44 +58,38 @@ def main():
         server_socket.bind((HOST, PORT))
         server_socket.listen(1)
 
-        print(f"Servidor de cámara escuchando en {HOST}:{PORT}")
+        print(f"Servidor de captura escuchando en {HOST}:{PORT}")
         print("Esperando conexión desde la computadora receptora...")
 
         conn, addr = server_socket.accept()
         print(f"Receptor conectado desde {addr[0]}:{addr[1]}")
 
         with conn:
-            while True:
-                start_time = time.time()
-                
-                # En Wayland (Hyprland), mss y Pillow son incompatibles o lentos.
-                # Usamos grim que es la herramienta nativa para extraer fotogramas.
-                p = subprocess.Popen(["grim", "-t", "ppm", "-"], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
-                data, _ = p.communicate()
-                
-                if not data:
-                    print("Error capturando con grim.")
-                    continue
+            with mss.mss() as sct:
+                # monitor 1 suele ser el primario.
+                monitor = sct.monitors[1] 
+                while True:
+                    start_time = time.time()
+                    
+                    # Capturar la pantalla con mss (excelente rendimiento en X11/Windows/Mac)
+                    screen = sct.grab(monitor)
+                    
+                    # Convertir a numpy array y cambiar de BGRA a BGR (formato de OpenCV)
+                    frame = np.array(screen)
+                    frame = cv2.cvtColor(frame, cv2.COLOR_BGRA2BGR)
 
-                # Decodificar el raw PPM a imagen OpenCV
-                np_data = np.frombuffer(data, dtype=np.uint8)
-                frame = cv2.imdecode(np_data, cv2.IMREAD_COLOR)
+                    frame = cv2.resize(frame, (FRAME_WIDTH, FRAME_HEIGHT))
 
-                if frame is None:
-                    continue
+                    ok = send_frame(conn, frame)
 
-                frame = cv2.resize(frame, (FRAME_WIDTH, FRAME_HEIGHT))
+                    if not ok:
+                        print("Error: no se pudo enviar el frame.")
+                        continue
 
-                ok = send_frame(conn, frame)
-
-                if not ok:
-                    print("Error: no se pudo enviar el frame.")
-                    continue
-
-                # Controlar FPS
-                elapsed = time.time() - start_time
-                if elapsed < FRAME_DELAY:
-                    time.sleep(FRAME_DELAY - elapsed)
+                    # Controlar FPS
+                    elapsed = time.time() - start_time
+                    if elapsed < FRAME_DELAY:
+                        time.sleep(FRAME_DELAY - elapsed)
 
     except KeyboardInterrupt:
         print("\nServidor detenido por el usuario.")
@@ -120,7 +101,7 @@ def main():
         print("El receptor reinició la conexión.")
 
     except Exception as e:
-        print(f"Error en servidor de cámara: {e}")
+        print(f"Error en servidor de captura: {e}")
 
     finally:
         server_socket.close()
