@@ -10,7 +10,7 @@ import time
 
 # IP de la computadora que recibirá el video.
 # Cambia esto por la IP local de la computadora receptora.
-RECEIVER_IP = "192.168.1.75"
+RECEIVER_IP = "127.0.0.1"
 
 # Puerto que usará el receptor.
 RECEIVER_PORT = 9999

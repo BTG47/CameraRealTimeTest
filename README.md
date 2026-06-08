@@ -2,10 +2,16 @@
 
 Este proyecto permite transmitir video en tiempo real desde la cámara de una computadora hacia otra computadora dentro de la misma red local.
 
-El sistema se divide en dos programas:
+El sistema se divide en cuatro programas dependiendo del objetivo y tipo de conexión:
+
+Sí se busca que la computadora emisora se conecte pidiendo a la computadora receptora
 
 - `sender_camera.py`: se ejecuta en la computadora que tiene la cámara.
 - `receiver_viewer.py`: se ejecuta en la computadora que recibirá y mostrará el video.
+
+Sí se busca que la computadora receptora se conecte a la computadora emisora (reverse network)
+
+- `camera_server.py`: se ejecuta en la computadora que tiene la cámara 
 
 La transmisión se realiza usando sockets TCP. Cada frame de la cámara se comprime como imagen JPEG y se envía por red al receptor.
 
