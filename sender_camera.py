@@ -2,6 +2,8 @@ import cv2
 import socket
 import struct
 import time
+import numpy as np
+from PIL import ImageGrab
 
 
 # ============================================================
@@ -47,32 +49,21 @@ def connect_to_receiver():
 
 
 def main():
-    # Abrir cámara
-    camera = cv2.VideoCapture(CAMERA_INDEX)
-
-    if not camera.isOpened():
-        print("Error: no se pudo abrir la cámara.")
-        return
-
-    # Configurar resolución de captura
-    camera.set(cv2.CAP_PROP_FRAME_WIDTH, FRAME_WIDTH)
-    camera.set(cv2.CAP_PROP_FRAME_HEIGHT, FRAME_HEIGHT)
-
     # Conectar al receptor
     try:
         client_socket = connect_to_receiver()
     except Exception as e:
         print(f"Error al conectar con el receptor: {e}")
-        camera.release()
         return
 
     try:
         while True:
-            ret, frame = camera.read()
-
-            if not ret:
-                print("Error: no se pudo leer frame de la cámara.")
-                break
+            # Capturar la pantalla
+            screen = ImageGrab.grab()
+            
+            # Convertir a numpy array y cambiar de RGB a BGR (formato de OpenCV)
+            frame = np.array(screen)
+            frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
 
             # Redimensionar por seguridad
             frame = cv2.resize(frame, (FRAME_WIDTH, FRAME_HEIGHT))
@@ -104,9 +95,8 @@ def main():
         print(f"Error durante la transmisión: {e}")
 
     finally:
-        camera.release()
         client_socket.close()
-        print("Cámara y conexión cerradas.")
+        print("Conexión cerrada.")
 
 
 if __name__ == "__main__":
